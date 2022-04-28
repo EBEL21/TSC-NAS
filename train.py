@@ -63,7 +63,7 @@ def train_wo_arch(model, dataloader, optimizer, criterion):
         x, y = batch[0].to(model.device), batch[1].to(model.device)
         x.unsqueeze(1)
 
-        pred_gumbel = model(x, sampling=True, mode='gumbel')
+        pred_gumbel, _ = model(x, sampling=True, mode='gumbel')
         loss = criterion(pred_gumbel, y)
         model.reset_switches()
 
@@ -82,9 +82,10 @@ def train_wo_arch(model, dataloader, optimizer, criterion):
 
 
 def train_w_arch(model, train_loader, valid_loader, optimizer_w, optimizer_a, criterion):
-    objs = AverageMeter()
+    objs_a = AverageMeter()
+    objs_m = AverageMeter()
     top1 = AverageMeter()
-
+    target_size = 1
     model.train()
 
     for step, batch in enumerate(train_loader):
@@ -123,18 +124,20 @@ def train_w_arch(model, train_loader, valid_loader, optimizer_w, optimizer_a, cr
                 param.requires_grad = True
 
             pred, mem_total = model(x_val, sampling=False)
-            print(mem_total)
             loss_a = criterion(pred, y_val)
-            loss_m = 0
-            objs.update(loss_a.item())
+            loss_m = torch.abs(mem_total/target_size - 1.0)
+            total_loss = loss_a + loss_m * 0.3
+            objs_a.update(loss_a.item())
+            objs_m.update(loss_m.item())
 
             prec1 = accuracy(pred, y_val)
             top1.update(prec1[0].item())
 
             optimizer_a.zero_grad()
-            loss_a.backward()
+            total_loss.backward()
             optimizer_a.step()
 
         if step % 100 == 0:
-            logging.info('TRAIN w_Arch Step: %04d Objs_W: %f R1: %f', step, objs.avg, top1.avg)
+            logging.info('TRAIN w_Arch Step: %04d Objs_a: %f Objs_m: %f R1: %f',
+                         step, objs_a.avg, objs_m.avg, top1.avg)
     return top1.avg

@@ -48,7 +48,7 @@ for epoch in range(epochs):
     # epoch_start = time.time()
     model.set_temperature(T)
     logging.info('Epoch: %d lr: %e T: %e', epoch, w_lr, T)
-    if epoch < 0:
+    if epoch < 10:
         train_acc = train_wo_arch(model, train_loader, optimizer_w, criterion)
     else:
         train_acc = train_w_arch(model, train_loader, test_loader, optimizer_w, optimizer_a, criterion)
