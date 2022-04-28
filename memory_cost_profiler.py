@@ -106,7 +106,7 @@ def count_activation_size(net, input_size=(1, 3, 224, 224), require_backward=Tru
 
     x = torch.zeros(input_size).to(model.parameters().__next__().device)
     with torch.no_grad():
-        model(x)
+        model(x, sampling=True, mode='gumbel')
 
     memory_info_dict = {
         'peak_activation_size': torch.zeros(1),
@@ -131,23 +131,23 @@ def count_activation_size(net, input_size=(1, 3, 224, 224), require_backward=Tru
             m.old_forward = m.forward
             m.forward = new_forward(m)
 
-        if (isinstance(m, ResidualBlock) and m.shortcut is not None) or \
-                (isinstance(m, InvertedResidual) and m.use_res_connect) or \
-                type(m) in [BasicBlock, Bottleneck]:
-            def new_forward(_module):
-                def lambda_forward(_x):
-                    memory_info_dict['residual_size'] = _x.numel() * act_byte
-                    result = _module.old_forward(_x)
-                    memory_info_dict['residual_size'] = 0
-                    return result
-
-                return lambda_forward
-
-            m.old_forward = m.forward
-            m.forward = new_forward(m)
+        # if (isinstance(m, ResidualBlock) and m.shortcut is not None) or \
+        #         (isinstance(m, InvertedResidual) and m.use_res_connect) or \
+        #         type(m) in [BasicBlock, Bottleneck]:
+        #     def new_forward(_module):
+        #         def lambda_forward(_x):
+        #             memory_info_dict['residual_size'] = _x.numel() * act_byte
+        #             result = _module.old_forward(_x)
+        #             memory_info_dict['residual_size'] = 0
+        #             return result
+        #
+        #         return lambda_forward
+        #
+        #     m.old_forward = m.forward
+        #     m.forward = new_forward(m)
 
     with torch.no_grad():
-        model(x)
+        model(x,sampling=True, mode='gumbel')
 
     return memory_info_dict['peak_activation_size'].item(), memory_info_dict['grad_activation_size'].item()
 

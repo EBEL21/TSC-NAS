@@ -21,9 +21,10 @@ test_loader = DataLoader(test_data, batch_size=64, shuffle=True)
 
 num_blocks = 5
 activation = 'relu'
-max_channels = [256] * 5
-kss = [3] * 5
+max_channels = [256] * num_blocks
+kss = [3, 5, 7]
 device = 'cuda'
+from memory_cost_profiler import profile_memory_cost
 
 os.environ['CUDA_DEVICE_ORDER'] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
@@ -31,22 +32,28 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 T = 5.0
 T_decay = 0.96
 
-model = _RNN_FCN_Base(train_data.in_channel, train_data.out_channel, num_blocks, activation, max_channels, kss)
+model = _RNN_FCN_Base(train_data.in_channel, train_data.out_channel, num_blocks,
+                      activation, max_channels, kss, 3, 256, device=device)
 model.to(device)
 
-epochs = 500
-lr = 3e-4
+epochs = 200
+w_lr = 3e-4
+a_lr = 1e-2
 
-optimizer_w = torch.optim.SGD(model.weight_params(), lr=lr)
-optimizer_a = torch.optim.Adam(model.arch_params(), lr=lr)
+optimizer_w = torch.optim.SGD(model.weight_params(), lr=w_lr)
+optimizer_a = torch.optim.Adam(model.arch_params(), lr=a_lr)
 criterion = nn.CrossEntropyLoss(label_smoothing=0.05)
 
 for epoch in range(epochs):
     # epoch_start = time.time()
     model.set_temperature(T)
-    logging.info('Epoch: %d lr: %e T: %e', epoch, lr, T)
-    if epoch < 10:
+    logging.info('Epoch: %d lr: %e T: %e', epoch, w_lr, T)
+    if epoch < 0:
         train_acc = train_wo_arch(model, train_loader, optimizer_w, criterion)
     else:
         train_acc = train_w_arch(model, train_loader, test_loader, optimizer_w, optimizer_a, criterion)
         T *= T_decay
+
+    # arch_params = model.arch_params()
+    # for p in arch_params:
+    #     print(p)

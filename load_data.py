@@ -7,6 +7,7 @@ from sktime.datasets import load_from_tsfile_to_dataframe
 import pandas as pd
 import warnings
 from torch.utils.data import Dataset
+from augmentation import *
 
 warnings.filterwarnings(action='ignore', message=r"Passing", category=FutureWarning)
 
@@ -14,18 +15,14 @@ warnings.filterwarnings(action='ignore', message=r"Passing", category=FutureWarn
 # TODO: define augmentation functions
 # See Figure.1 in https://arxiv.org/pdf/2007.15951.pdf
 # Jitter, Scaling, Time Warping, Magnitude etc...
+# https://github.com/uchidalab/time_series_augmentation/blob/master/utils/augmentation.py
 
-def jitter(x):
-    out = None
+def transformation(x):
+    x = jitter(x)
+    x = scaling(x)
+    x = magnitude_warp(x)
 
-    return out
-
-
-def scaling(x):
-    out = None
-
-    return out
-
+    return x
 
 class TSCDataset(Dataset):
     def __init__(self, data_name, var_type='Multi', split='train'):
@@ -40,7 +37,7 @@ class TSCDataset(Dataset):
         total_data = []
         for data in self.x.values:
             total_data.append(data.tolist())
-        self.x = torch.FloatTensor(total_data)
+        self.x = np.array(total_data)
         self.y = self.convert_to_label(self.y)
 
         self.in_channel = self.x.shape[1]
@@ -51,10 +48,13 @@ class TSCDataset(Dataset):
         label_dict = {n: i for i, n in enumerate(unique)}
         y = np.vectorize(label_dict.get)(y)
         y = np.eye(len(unique))[y]
-        return torch.FloatTensor(y)
+        return y
 
     def __len__(self):
         return len(self.y)
 
     def __getitem__(self, idx):
-        return self.x[idx], self.y[idx]
+
+        x = torch.FloatTensor(self.x[idx])
+        y = torch.FloatTensor(self.y[idx])
+        return x, y

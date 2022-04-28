@@ -1,5 +1,8 @@
 import torch
 import logging
+from augmentation import transformation
+from layers import NASConv1d
+from memory_cost_profiler import profile_memory_cost
 
 
 class AverageMeter(object):
@@ -59,10 +62,10 @@ def train_wo_arch(model, dataloader, optimizer, criterion):
     for step, batch in enumerate(dataloader):
         x, y = batch[0].to(model.device), batch[1].to(model.device)
         x.unsqueeze(1)
+
         pred_gumbel = model(x, sampling=True, mode='gumbel')
-        # print(y[:5])
         loss = criterion(pred_gumbel, y)
-        # print(loss)
+        model.reset_switches()
 
         optimizer.zero_grad()
         loss.backward()
@@ -92,10 +95,10 @@ def train_w_arch(model, train_loader, valid_loader, optimizer_w, optimizer_a, cr
 
         x, y = batch[0].to(model.device), batch[1].to(model.device)
         x.unsqueeze(1)
-        pred_gumbel = model(x, sampling=True, mode='gumbel')
+        pred_gumbel, _ = model(x, sampling=True, mode='gumbel')
         loss_gumbel = criterion(pred_gumbel, y)
 
-        pred_random = model(x, sampling=True, mode='random')
+        pred_random, _ = model(x, sampling=True, mode='random')
         loss_random = criterion(pred_random, y)
 
         loss = loss_gumbel + loss_random
@@ -119,8 +122,10 @@ def train_w_arch(model, train_loader, valid_loader, optimizer_w, optimizer_a, cr
             for param in model.arch_params():
                 param.requires_grad = True
 
-            pred = model(x_val, sampling=False)
+            pred, mem_total = model(x_val, sampling=False)
+            print(mem_total)
             loss_a = criterion(pred, y_val)
+            loss_m = 0
             objs.update(loss_a.item())
 
             prec1 = accuracy(pred, y_val)
